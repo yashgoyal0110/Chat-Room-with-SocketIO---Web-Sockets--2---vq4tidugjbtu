@@ -9,7 +9,7 @@ const http = require('http').createServer(app);
 const io = require("socket.io")(http);
 
 // This will contain all the users
-const users = [];
+let users = [];
 
 // Setting up of port 
 const port = process.env.PORT || 3000;
@@ -30,6 +30,38 @@ app.use(express.static(path.join(__dirname, 'public')));
   // also remove the user from users array send updated users array about "updateUsers" to every socket
 
   // Listen for "chatMessage" for any message and send {username:msg.username,message:msg.message} about "message" to every socket
+
+  io.on("connection", (socket) => {
+    console.log("user connected:", socket.id);
+  
+    socket.emit("message",  { username: "Bot", message: "Welcome to chatbox" });
+  
+    socket.on("userJoin", (username) => {
+      users.push({id: socket.id, username: username});
+      socket.broadcast.emit("message", {
+        username: "Bot",
+        message: `${username} has joined the chat`,
+      });
+      io.emit("updateUsers", users);
+      console.log('users', users);
+    });
+  
+    socket.on("disconnect", () => {
+      console.log("disconnected", socket.id);
+      const user = users.find(user => user.id === socket.id);
+      if (user) {
+          users = users.filter(user => user.id !== socket.id);
+          socket.broadcast.emit("message", { username: "Bot", message: `${user.username} has left the chat` });
+          io.emit("updateUsers", users);
+      }
+    });
+  
+    socket.on("chatMessage", (msg) => {
+      const msgData = { username: msg.username, message: msg.message };
+      io.emit("message", msgData);
+    });
+  });
+  
 
 
 let server = http.listen(port, () => console.log(`Server Running at port ${port}`));
